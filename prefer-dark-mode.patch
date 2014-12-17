@@ -1,0 +1,91 @@
+>From 7679c96fb785bc682b086f08482411311d12f84a Mon Sep 17 00:00:00 2001
+From: Antono Vasiljev <address@hidden>
+Date: Wed, 30 May 2012 16:56:42 +0300
+Subject: [PATCH] Implemented lisp function application-prefer-dark-theme
+
+* src/xsettings.c: GtkSetting and function definition
+* src/xsettings.h: EXFUN macro for application-prefer-dark-theme
+---
+ src/xsettings.c |   32 ++++++++++++++++++++++++++++++++
+ src/xsettings.h |    1 +
+ 2 files changed, 33 insertions(+)
+
+diff --git a/src/xsettings.c b/src/xsettings.c
+index 69ef22f..d8c01c7 100644
+--- a/src/xsettings.c
++++ b/src/xsettings.c
+@@ -201,6 +201,7 @@ struct xsettings
+ /* The single GSettings instance, or NULL if not connected to GSettings.  */
+ 
+ static GSettings *gsettings_client;
++static GtkSettings *gtk_settings;
+ 
+ /* Callback called when something changed in GSettings.  */
+ 
+@@ -824,6 +825,8 @@ init_gsettings (void)
+   g_signal_connect (G_OBJECT (gsettings_client), "changed",
+                     G_CALLBACK (something_changed_gsettingsCB), NULL);
+ 
++  gtk_settings = gtk_settings_get_default ();
++
+   val = g_settings_get_value (gsettings_client, GSETTINGS_TOOL_BAR_STYLE);
+   if (val)
+     {
+@@ -1004,6 +1007,30 @@ known style.  Otherwise return image.  */)
+   return Qimage;
+ }
+ 
++DEFUN ("application-prefer-dark-theme",
++       Fapplication_prefer_dark_theme,
++       Sapplication_prefer_dark_theme,
++       0, 1, 0,
++       doc: /* Set dark theme variant for application if supported by
++GUI toolkit and ARG is not nil. */)
++  (Lisp_Object arg)
++{
++  gboolean result = FALSE;
++
++#ifdef HAVE_GSETTINGS
++  if (NILP (arg) || (NUMBERP(arg) && (XINT(arg) < 0))) {
++    result = FALSE;
++  } else {
++    result = TRUE;
++  }
++
++  g_object_set (G_OBJECT (gtk_settings),
++                "gtk-application-prefer-dark-theme", result, NULL);
++#endif
++
++  return result ? Fmake_symbol (build_string ("t")) : Qnil;
++}
++
+ void
+ syms_of_xsettings (void)
+ {
+@@ -1012,6 +1039,7 @@ syms_of_xsettings (void)
+   first_dpyinfo = NULL;
+ #ifdef HAVE_GSETTINGS
+   gsettings_client = NULL;
++  gtk_settings = NULL;
+ #endif
+ #ifdef HAVE_GCONF
+   gconf_client = NULL;
+@@ -1041,6 +1069,10 @@ If this variable is nil, Emacs ignores system font changes.  */);
+ #endif
+ #endif
+ 
++#ifdef HAVE_GSETTINGS
++  defsubr (&Sapplication_prefer_dark_theme);
++#endif
++
+   current_tool_bar_style = Qnil;
+   DEFSYM (Qtool_bar_style, "tool-bar-style");
+   defsubr (&Stool_bar_get_system_style);
+diff --git a/src/xsettings.h b/src/xsettings.h
+index d6b0c09..83b5cfc 100644
+--- a/src/xsettings.h
++++ b/src/xsettings.h
+@@ -21,2 +21,3 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
+ #define XSETTINGS_H
+ 
++EXFUN (Fapplication_prefer_dark_theme, 1);
